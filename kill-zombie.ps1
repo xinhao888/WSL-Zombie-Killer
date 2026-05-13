@@ -18,7 +18,8 @@
     Runs every 30 seconds, stops after successful kill
   
 .NOTES
-  Author: Community tool
+  Author: XinHaoZiDongHua
+  Repository: https://github.com/XinHaoZiDongHua/WSL-Zombie-Killer
   Dependencies: Backstab (github.com/Yaxser/Backstab)
 #>
 

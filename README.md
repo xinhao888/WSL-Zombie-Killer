@@ -174,6 +174,10 @@ D:\WSL-Tools\
 
 ---
 
+## Author
+
+**XinHaoZiDongHua** — [GitHub](https://github.com/XinHaoZiDongHua)
+
 ## License
 
 MIT License. See `LICENSE` file.

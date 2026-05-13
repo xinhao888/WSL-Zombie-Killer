@@ -3,7 +3,8 @@
 ║         Universal Edition — Auto-kill wslservice.exe        ║
 ╚═══════════════════════════════════════════════════════════════╝
 
-GitHub:  https://github.com/YOURNAME/WSL-Zombie-Killer
+GitHub:  https://github.com/XinHaoZiDongHua/WSL-Zombie-Killer
+作者:    XinHaoZiDongHua
 License: MIT
 
 
