@@ -144,13 +144,16 @@ function Test-WSLZombie {
     $proc = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc) { return $false }
 
-    # Safety: require process StartTime (some system processes might not report it)
-    if (-not $proc.StartTime) { return $false }
-
-    # Safety: process must have been running for > $minProcAge seconds
-    # This excludes transient states during clean shutdown
-    $procAge = (Get-Date) - $proc.StartTime
-    if ($procAge.TotalSeconds -lt $minProcAge) { return $false }
+    # Get process age via CIM (Get-Process StartTime may be empty on some systems)
+    $procAge = $null
+    $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -Property CreationDate -ErrorAction SilentlyContinue
+    if ($ci -and $ci.CreationDate) {
+        try {
+            $ts = [DateTime]::ParseExact($ci.CreationDate.Substring(0,14), 'yyyyMMddHHmmss', $null)
+            $procAge = (Get-Date) - $ts
+        } catch {}
+    }
+    if ($procAge -and $procAge.TotalSeconds -lt $minProcAge) { return $false }
 
     # Check LxssManager service state
     $svc = Get-CimInstance -ClassName Win32_Service -Filter "Name='LxssManager'" -ErrorAction SilentlyContinue
@@ -174,15 +177,26 @@ function Test-WSLZombie {
 
 function Invoke-KillZombie {
     param($Proc)
-    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Detected zombie wslservice.exe PID $($Proc.Id), age $([math]::Round((Get-Date - $Proc.StartTime).TotalMinutes,1)) min" | Out-File $logPath -Append
-
-    # Method 1: Backstab
-    if (Test-Path $backstabPath) {
-        for ($i = 0; $i -lt 3; $i++) {
-            & $backstabPath -n wslservice.exe -k
-            Start-Sleep 2
-            if (-not (Get-Process wslservice -EA 0)) { break }
+    $ageStr = ""
+    try {
+        $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$($Proc.Id)" -Property CreationDate -EA 0
+        if ($ci -and $ci.CreationDate) {
+            $ts = [DateTime]::ParseExact($ci.CreationDate.Substring(0,14), 'yyyyMMddHHmmss', $null)
+            $ageStr = ", age $([math]::Round(((Get-Date) - $ts).TotalMinutes,1)) min"
         }
+    } catch {}
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Detected zombie wslservice.exe PID $($Proc.Id)$ageStr" | Out-File $logPath -Append
+
+    # Method 1: Backstab (set working dir so it can write driver)
+    if (Test-Path $backstabPath) {
+        Push-Location $toolsDir
+        try {
+            for ($i = 0; $i -lt 3; $i++) {
+                & $backstabPath -n wslservice.exe -k -d "$toolsDir\"
+                Start-Sleep 2
+                if (-not (Get-Process wslservice -EA 0)) { break }
+            }
+        } finally { Pop-Location }
         if (-not (Get-Process wslservice -EA 0)) {
             "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Killed via Backstab" | Out-File $logPath -Append
             return $true
