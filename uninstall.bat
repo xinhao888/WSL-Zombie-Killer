@@ -1,26 +1,29 @@
 @echo off
 cd /d "%~dp0"
-title 卸载 - 自动杀WSL僵尸进程
+title WSL Zombie Killer - Uninstall
 
 schtasks /Query /TN "KillWSLZombie" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!!!] 未检测到 KillWSLZombie 任务，无需卸载。
+    echo [INFO] Task "KillWSLZombie" not found. Nothing to uninstall / 未检测到任务，无需卸载.
     pause
     exit /b 1
 )
 
-echo [1/2] 删除定时任务...
+echo [1/2] Removing scheduled task / 删除定时任务...
 schtasks /Delete /TN "KillWSLZombie" /F
 
-echo [2/2] 清理排除项（如有需要可手动操作，不影响系统）
+echo [2/2] Done.
 echo.
-echo ============================================
-echo   卸载完成!
-echo ============================================
+echo ==============================================
+echo   WSL Zombie Killer - Uninstalled! / 已卸载
+echo ==============================================
 echo.
-echo   文件未删除，如需彻底移除请手动删除:
-echo     D:\WSL-Tools\ 整个文件夹
+echo   - Task removed / 任务已删除
+echo   - Files NOT deleted / 文件未删除
+echo     To fully remove: delete D:\WSL-Tools\ folder
+echo     如需彻底移除请手动删除 D:\WSL-Tools\ 文件夹
 echo.
-echo   如需重新安装，直接运行 install.bat 即可。
+echo   To reinstall: run install.bat (Admin)
+echo   重新安装: 以管理员运行 install.bat
 echo.
 pause

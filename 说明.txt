@@ -97,8 +97,8 @@ License: MIT
 │  kill-zombie.ps1         Main script / 主脚本                   │
 │  install.bat             Installer / 安装器                     │
 │  uninstall.bat           Uninstaller / 卸载器                   │
-│  一键安装.vbs             One-click install / 一键安装           │
-│  一键卸载.vbs             One-click uninstall / 一键卸载         │
+│  一键安装.vbs             One-click install (relative path)        │
+│  一键卸载.vbs             One-click uninstall (relative path)      │
 │  zombie-killer-task.xml  Task definition / 任务配置             │
 │  zombie-kill.log         Kill log / 运行日志（自动生成）         │
 │  Backstab64.exe          Killer tool / 杀进程工具（见下方说明）  │

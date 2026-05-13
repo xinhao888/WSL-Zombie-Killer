@@ -119,18 +119,18 @@ Backstab64.exe -n wslservice.exe -k
 ## File Structure
 
 ```
-D:\WSL-Tools\
+AnyFolder\
 ├── README.md              This file
 ├── LICENSE                MIT License
-├── kill-zombie.ps1        Main detection + kill script
-├── install.bat            Installer (Admin)
-├── uninstall.bat          Uninstaller (Admin)
-├── 一键安装.vbs            One-click installer (auto-elevate)
-├── 一键卸载.vbs            One-click uninstaller (auto-elevate)
-├── zombie-killer-task.xml Scheduled task definition
+├── kill-zombie.ps1        Main detection + kill + install/uninstall script
+├── install.bat            Installer (Admin) — auto-patches paths, bilingual
+├── uninstall.bat          Uninstaller (Admin) — bilingual
+├── 一键安装.vbs            One-click installer (relative path, works anywhere)
+├── 一键卸载.vbs            One-click uninstaller (relative path, works anywhere)
+├── zombie-killer-task.xml Scheduled task template (paths auto-patched on install)
 ├── zombie-kill.log        Kill log (auto-generated)
-├── Backstab64.exe         Backstab killer tool
-└── 说明.txt               Chinese documentation
+├── Backstab64.exe         Backstab killer tool (auto-downloaded or manual)
+└── 说明.txt               Chinese + English documentation
 ```
 
 ---
