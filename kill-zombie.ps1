@@ -19,7 +19,7 @@
   
 .NOTES
   Author: XinHaoZiDongHua
-  Repository: https://github.com/XinHaoZiDongHua/WSL-Zombie-Killer
+  Repository: https://github.com/xinhao888/WSL-Zombie-Killer
   Dependencies: Backstab (github.com/Yaxser/Backstab)
 #>
 

@@ -1,3 +1,2 @@
 ' WSL Zombie Killer - One-Click Uninstall (auto-elevates to admin)
-CreateObject("WScript.Shell").CurrentDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
-CreateObject("Shell.Application").ShellExecute "uninstall.bat", "", "", "runas", 5
+CreateObject("Shell.Application").ShellExecute CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName) & "\uninstall.bat", "", "", "runas", 5

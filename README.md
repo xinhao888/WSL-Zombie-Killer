@@ -176,7 +176,7 @@ AnyFolder\
 
 ## Author
 
-**XinHaoZiDongHua** — [GitHub](https://github.com/XinHaoZiDongHua)
+**XinHaoZiDongHua** — [GitHub](https://github.com/xinhao888)
 
 ## License
 

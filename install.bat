@@ -27,9 +27,8 @@ if not exist "%~dp0Backstab64.exe" (
     echo   Already present / 已存在.
 )
 
-echo [3/5] Generating task config for this path / 生成任务配置...
-set "ps1path=%~dp0kill-zombie.ps1"
-powershell -Command "(Get-Content '%~dp0zombie-killer-task.xml' -Raw) -replace 'D:\\WSL-Tools\\kill-zombie.ps1', '%ps1path:\=\\%' | Set-Content '%~dp0zombie-killer-task-temp.xml' -Encoding Unicode"
+echo [3/5] Generating task config for this path...
+powershell -Command "$raw='%~dp0kill-zombie.ps1'; (Get-Content '%~dp0zombie-killer-task.xml' -Raw) -replace 'D:\\WSL-Tools\\kill-zombie\.ps1', $raw | Set-Content '%~dp0zombie-killer-task-temp.xml' -Encoding Unicode"
 
 echo [4/5] Registering scheduled task / 注册定时任务...
 schtasks /Create /TN "KillWSLZombie" /XML "%~dp0zombie-killer-task-temp.xml" /F
