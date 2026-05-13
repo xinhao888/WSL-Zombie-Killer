@@ -3,13 +3,12 @@
   WSL Zombie Killer - Universal Edition
   Detects and terminates zombie wslservice.exe processes.
    
-  DETECTION (multi-layer, no false positives):
-    1. VmmemWSL exists → WSL VM is alive → SKIP (strongest signal)
-    2. wslservice has child processes → normal WSL → SKIP
-    3. Process age > 60s (excludes startup transients)
-    4. LxssManager "Running" → definitely not zombie → SKIP
-       (Stopped is NOT required — some Win10 systems always show Stopped)
-    5. Double-check after 3s delay before killing
+   DETECTION (multi-layer, no false positives):
+     1. vmmem / VmmemWSL exists → WSL VM is alive → SKIP (strongest signal)
+     2. wslservice age < 120s → still booting → SKIP (grace period)
+     3. wslservice has child processes → normal WSL → SKIP
+     4. LxssManager "Running" → definitely not zombie → SKIP
+     5. Double-check after 3s delay before killing
    
   KILL (auto-fallback):
     1. Backstab.exe (kernel driver, Microsoft-signed)
@@ -37,10 +36,6 @@ $backstabPath = "$toolsDir\Backstab64.exe"
 $taskName = "KillWSLZombie"
 $logPath = "$toolsDir\zombie-kill.log"
 
-# Min age in seconds for a process to be considered a zombie
-# (excludes clean shutdown transients)
-$minProcAge = 60
-
 function Show-Help {
     Write-Host @"
 WSL Zombie Killer - Universal Edition
@@ -51,11 +46,11 @@ USAGE:
   powershell -File kill-zombie.ps1                Run once
 
 DETECTION (safe):
-   VmmemWSL exists → WSL VM alive → skip
+   vmmem / VmmemWSL exists → WSL VM alive → skip
+   wslservice age < 120s → still booting → skip
    wslservice has children → normal → skip
-   Process age >60s + no children + VmmemWSL gone → zombie
+   Age > 120s + no vmmem + no children → zombie
    Double-check after 3s before killing
-   (LxssManager is supplementary only — some Win10 systems always show Stopped)
 
 KILL METHODS (auto-fallback):
   1. Backstab (kernel driver)
@@ -156,24 +151,25 @@ function Test-WSLZombie {
     $proc = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc) { return $false }
 
-    # Safety 1: VmmemWSL process exists = WSL VM is alive, NOT a zombie
-    if (Get-Process VmmemWSL -ErrorAction SilentlyContinue) { return $false }
+    # Safety 1: Vmmem process exists = WSL VM is alive, NOT a zombie
+    # Some systems name it "VmmemWSL", others just "vmmem" (Win10 22H2)
+    if ((Get-Process VmmemWSL -ErrorAction SilentlyContinue) -or (Get-Process vmmem -ErrorAction SilentlyContinue)) { return $false }
 
-    # Safety 2: wslservice with child processes = normal WSL running
-    # Orphaned wslservice (no children) = likely zombie
-    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
-    if ($children) { return $false }
-
-    # Get process age via CIM (Get-Process StartTime may be empty on some systems)
-    $procAge = $null
+    # Safety 2: wslservice is very young (< 120s) — WSL may still be booting, vmmem hasn't spawned yet
+    # Give it more time before judging
     $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -Property CreationDate -ErrorAction SilentlyContinue
     if ($ci -and $ci.CreationDate) {
         try {
             $ts = [DateTime]::ParseExact($ci.CreationDate.Substring(0,14), 'yyyyMMddHHmmss', $null)
             $procAge = (Get-Date) - $ts
+            if ($procAge.TotalSeconds -lt 120) { return $false }
         } catch {}
     }
-    if ($procAge -and $procAge.TotalSeconds -lt $minProcAge) { return $false }
+
+    # Safety 3: wslservice with child processes = normal WSL running
+    # Orphaned wslservice (no children) = likely zombie
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
+    if ($children) { return $false }
 
     # Check LxssManager service state (supplementary, not primary — service may show
     # Stopped even when WSL is running on some Win10 systems)
@@ -184,7 +180,7 @@ function Test-WSLZombie {
 
     # Double-check after 3s delay (all primary checks)
     Start-Sleep 3
-    if (Get-Process VmmemWSL -ErrorAction SilentlyContinue) { return $false }
+    if ((Get-Process VmmemWSL -ErrorAction SilentlyContinue) -or (Get-Process vmmem -ErrorAction SilentlyContinue)) { return $false }
     $proc2 = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc2) { return $false }
     $children2 = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc2.Id)" -ErrorAction SilentlyContinue
