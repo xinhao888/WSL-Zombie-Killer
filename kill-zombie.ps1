@@ -88,8 +88,13 @@ function Install-Tool {
         }
     }
 
-    # Register scheduled task
-    schtasks /Create /TN $taskName /XML $xmlPath /F
+    # Register scheduled task (patch XML path first)
+    $xmlContent = Get-Content $xmlPath -Raw
+    $xmlContent = $xmlContent -replace 'D:\\WSL-Tools\\kill-zombie\.ps1', "$toolsDir\kill-zombie.ps1"
+    $tempXml = "$toolsDir\task-temp.xml"
+    Set-Content $tempXml $xmlContent -Encoding Unicode
+    schtasks /Create /TN $taskName /XML $tempXml /F
+    Remove-Item $tempXml -Force -ErrorAction SilentlyContinue
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Installed successfully."
     } else {
