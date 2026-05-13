@@ -88,11 +88,53 @@ function Install-Tool {
         }
     }
 
-    # Register scheduled task (patch XML path first)
-    $xmlContent = Get-Content $xmlPath -Raw
-    $xmlContent = $xmlContent -replace 'D:\\WSL-Tools\\kill-zombie\.ps1', "$toolsDir\kill-zombie.ps1"
+    # Register scheduled task with dynamically generated XML
+    $ps1Path = "$toolsDir\kill-zombie.ps1"
+    $taskXml = @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Auto-kill zombie wslservice.exe. Runs at boot and on WSL start.</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <BootTrigger>
+      <Enabled>true</Enabled>
+      <Repetition>
+        <Interval>PT30S</Interval>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+    </BootTrigger>
+    <EventTrigger>
+      <Enabled>true</Enabled>
+      <Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='Service Control Manager'] and (EventID=7036)]] and *[EventData[Data[@Name='param1']='LxssManager'] and Data[@Name='param2']='running']]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription>
+      <Delay>PT5S</Delay>
+    </EventTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <Enabled>true</Enabled>
+    <AllowStartIfOnBatteries>true</AllowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>powershell.exe</Command>
+      <Arguments>-NoLogo -NoProfile -ExecutionPolicy Bypass -File "$ps1Path"</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+"@
     $tempXml = "$toolsDir\task-temp.xml"
-    Set-Content $tempXml $xmlContent -Encoding Unicode
+    Set-Content $tempXml $taskXml -Encoding Unicode
     schtasks /Create /TN $taskName /XML $tempXml /F
     Remove-Item $tempXml -Force -ErrorAction SilentlyContinue
     if ($LASTEXITCODE -eq 0) {
