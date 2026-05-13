@@ -101,7 +101,6 @@ function Install-Tool {
       <Enabled>true</Enabled>
       <Repetition>
         <Interval>PT1M</Interval>
-        <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
     </BootTrigger>
   </Triggers>
@@ -112,12 +111,6 @@ function Install-Tool {
   </Principals>
   <Settings>
     <Enabled>true</Enabled>
-    <AllowStartIfOnBatteries>true</AllowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <IdleSettings>
-      <StopOnIdleEnd>false</StopOnIdleEnd>
-      <RestartOnIdle>false</RestartOnIdle>
-    </IdleSettings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
   </Settings>
   <Actions Context="Author">
