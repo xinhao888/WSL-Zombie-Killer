@@ -104,11 +104,6 @@ function Install-Tool {
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
     </BootTrigger>
-    <EventTrigger>
-      <Enabled>true</Enabled>
-      <Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='Service Control Manager'] and (EventID=7036)]] and *[EventData[Data[@Name='param1']='LxssManager'] and Data[@Name='param2']='running']]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription>
-      <Delay>PT5S</Delay>
-    </EventTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author">
