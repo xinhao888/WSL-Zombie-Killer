@@ -99,9 +99,6 @@ function Install-Tool {
   <Triggers>
     <BootTrigger>
       <Enabled>true</Enabled>
-      <Repetition>
-        <Interval>PT1M</Interval>
-      </Repetition>
     </BootTrigger>
   </Triggers>
   <Principals>
@@ -228,9 +225,11 @@ if ($Help) { Show-Help; return }
 if ($Install) { Install-Tool; return }
 if ($Uninstall) { Uninstall-Tool; return }
 
-if (Test-WSLZombie) {
-    $proc = Get-Process wslservice -EA 0
-    if ($proc -and (Invoke-KillZombie $proc)) {
-        schtasks /End /TN $taskName *>$null
+# Internal loop: check every 60s, kill any zombie, keep running forever
+while ($true) {
+    if (Test-WSLZombie) {
+        $proc = Get-Process wslservice -EA 0
+        if ($proc) { Invoke-KillZombie $proc }
     }
+    Start-Sleep 60
 }
