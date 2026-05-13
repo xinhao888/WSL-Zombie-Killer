@@ -2,23 +2,24 @@
 .SYNOPSIS
   WSL Zombie Killer - Universal Edition
   Detects and terminates zombie wslservice.exe processes.
-  
-  DETECTION (safe, no false positives):
-    1. wslservice.exe running + LxssManager "Stopped"
-       (NOT "Stop Pending" — avoids clean-shutdown false positive)
-    2. Process age > 60s (via CIM, safe fallback if unavailable)
-    3. Double-check after 3s delay before killing
-  
+   
+  DETECTION (multi-layer, no false positives):
+    1. VmmemWSL exists → WSL VM is alive → SKIP (strongest signal)
+    2. wslservice has child processes → normal WSL → SKIP
+    3. Process age > 60s (excludes startup transients)
+    4. LxssManager "Running" → definitely not zombie → SKIP
+       (Stopped is NOT required — some Win10 systems always show Stopped)
+    5. Double-check after 3s delay before killing
+   
   KILL (auto-fallback):
     1. Backstab.exe (kernel driver, Microsoft-signed)
     2. taskkill /F
     3. Stop-Process -Force
-  
+   
   SCHEDULED TASK: KillWSLZombie
-    Boot trigger, repeats every 1 minute (Win10 minimum)
-    Exits after each check; kills and logs on zombie detection
-  
-.NOTES
+    BootTrigger + LogonTrigger, script loops internally every 60s
+   
+ .NOTES
   Author: XinHaoZiDongHua
   Repository: https://github.com/xinhao888/WSL-Zombie-Killer
   Dependencies: Backstab (github.com/Yaxser/Backstab)
@@ -50,9 +51,11 @@ USAGE:
   powershell -File kill-zombie.ps1                Run once
 
 DETECTION (safe):
-  wslservice.exe running >60s + LxssManager "Stopped"
-  + double-check 3s later before killing
-  (Only "Stopped", not "Stop Pending" — no false positives)
+   VmmemWSL exists → WSL VM alive → skip
+   wslservice has children → normal → skip
+   Process age >60s + no children + VmmemWSL gone → zombie
+   Double-check after 3s before killing
+   (LxssManager is supplementary only — some Win10 systems always show Stopped)
 
 KILL METHODS (auto-fallback):
   1. Backstab (kernel driver)
@@ -90,25 +93,37 @@ function Install-Tool {
 
     # Register scheduled task with dynamically generated XML
     $ps1Path = "$toolsDir\kill-zombie.ps1"
+    # NOTE: BootTrigger + LogonTrigger for reliability:
+    #   - BootTrigger: fires on system startup (needs LogonType=S4U or Password for SYSTEM context)
+    #   - LogonTrigger: fires when user logs in (InteractiveToken works here)
+    #   - Script loops internally with while($true), so it only needs to be started once
     $taskXml = @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>Auto-kill zombie wslservice.exe. Runs at boot and on WSL start.</Description>
+    <Description>Auto-kill zombie wslservice.exe. Triggers at boot + user logon, loops internally.</Description>
   </RegistrationInfo>
   <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
     <BootTrigger>
       <Enabled>true</Enabled>
+      <Delay>PT1M</Delay>
     </BootTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author">
+      <LogonType>S4U</LogonType>
       <RunLevel>HighestAvailable</RunLevel>
     </Principal>
   </Principals>
   <Settings>
     <Enabled>true</Enabled>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
   </Settings>
   <Actions Context="Author">
     <Exec>
@@ -141,7 +156,10 @@ function Test-WSLZombie {
     $proc = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc) { return $false }
 
-    # Safety: wslservice with child processes = normal WSL running
+    # Safety 1: VmmemWSL process exists = WSL VM is alive, NOT a zombie
+    if (Get-Process VmmemWSL -ErrorAction SilentlyContinue) { return $false }
+
+    # Safety 2: wslservice with child processes = normal WSL running
     # Orphaned wslservice (no children) = likely zombie
     $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
     if ($children) { return $false }
@@ -157,25 +175,22 @@ function Test-WSLZombie {
     }
     if ($procAge -and $procAge.TotalSeconds -lt $minProcAge) { return $false }
 
-    # Check LxssManager service state
+    # Check LxssManager service state (supplementary, not primary — service may show
+    # Stopped even when WSL is running on some Win10 systems)
     $svc = Get-CimInstance -ClassName Win32_Service -Filter "Name='LxssManager'" -ErrorAction SilentlyContinue
-    if (-not $svc) { return $false }
+    # Only reject if service says Running (definitely not zombie)
+    if ($svc -and $svc.State -eq "Running") { return $false }
+    # Do NOT require Stopped — on some systems LxssManager is always "Stopped"
 
-    # Only match "Stopped", NOT "Stop Pending"
-    if ($svc.State -ne "Stopped") { return $false }
-
-    # Double-check after 3s delay
+    # Double-check after 3s delay (all primary checks)
     Start-Sleep 3
+    if (Get-Process VmmemWSL -ErrorAction SilentlyContinue) { return $false }
     $proc2 = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc2) { return $false }
     $children2 = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc2.Id)" -ErrorAction SilentlyContinue
     if ($children2) { return $false }
-    $svc2 = Get-CimInstance -ClassName Win32_Service -Filter "Name='LxssManager'" -ErrorAction SilentlyContinue
-    if ($svc2 -and $svc2.State -eq "Stopped") {
-        return $true
-    }
 
-    return $false
+    return $true
 }
 
 # ── Kill (multi-method) ──
