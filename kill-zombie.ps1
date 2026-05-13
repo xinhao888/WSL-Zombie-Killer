@@ -141,6 +141,10 @@ function Test-WSLZombie {
     $proc = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc) { return $false }
 
+    # Safety: if ANY WSL distro is Running, wslservice is normal → NOT zombie
+    $wsl = & { wsl -l -v 2>&1 }
+    if ($wsl -match '\s+Running\s+') { return $false }
+
     # Get process age via CIM (Get-Process StartTime may be empty on some systems)
     $procAge = $null
     $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -Property CreationDate -ErrorAction SilentlyContinue
@@ -156,14 +160,17 @@ function Test-WSLZombie {
     $svc = Get-CimInstance -ClassName Win32_Service -Filter "Name='LxssManager'" -ErrorAction SilentlyContinue
     if (-not $svc) { return $false }
 
-    # Only match "Stopped", NOT "Stop Pending" — avoids clean-shutdown false positive
+    # Only match "Stopped", NOT "Stop Pending"
     if ($svc.State -ne "Stopped") { return $false }
 
-    # Double-check: wait 3s and verify again before committing to kill
+    # Double-check after 3s delay
     Start-Sleep 3
     $proc2 = Get-Process wslservice -ErrorAction SilentlyContinue
+    if (-not $proc2) { return $false }
+    $wsl2 = & { wsl -l -v 2>&1 }
+    if ($wsl2 -match '\s+Running\s+') { return $false }
     $svc2 = Get-CimInstance -ClassName Win32_Service -Filter "Name='LxssManager'" -ErrorAction SilentlyContinue
-    if ($proc2 -and $svc2 -and $svc2.State -eq "Stopped") {
+    if ($svc2 -and $svc2.State -eq "Stopped") {
         return $true
     }
 
