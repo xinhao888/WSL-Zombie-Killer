@@ -100,7 +100,7 @@ function Install-Tool {
     <BootTrigger>
       <Enabled>true</Enabled>
       <Repetition>
-        <Interval>PT30S</Interval>
+        <Interval>PT1M</Interval>
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
     </BootTrigger>
