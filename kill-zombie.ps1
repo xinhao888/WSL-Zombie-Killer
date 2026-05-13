@@ -3,19 +3,20 @@
   WSL Zombie Killer - Universal Edition
   Detects and terminates zombie wslservice.exe processes.
   
-  DETECTION (safe, triple-checked):
+  DETECTION (safe, no false positives):
     1. wslservice.exe running + LxssManager "Stopped"
-       AND process age > 60 seconds (excludes clean shutdown)
-    2. Same as above + double-check after 3s delay
+       (NOT "Stop Pending" — avoids clean-shutdown false positive)
+    2. Process age > 60s (via CIM, safe fallback if unavailable)
+    3. Double-check after 3s delay before killing
   
   KILL (auto-fallback):
-    1. Backstab.exe (kernel driver, most reliable)
+    1. Backstab.exe (kernel driver, Microsoft-signed)
     2. taskkill /F
     3. Stop-Process -Force
   
   SCHEDULED TASK: KillWSLZombie
-    Triggers at boot + on LxssManager start
-    Runs every 30 seconds, stops after successful kill
+    Boot trigger, repeats every 1 minute (Win10 minimum)
+    Exits after each check; kills and logs on zombie detection
   
 .NOTES
   Author: XinHaoZiDongHua
@@ -34,7 +35,6 @@ $backstabUrl = "https://github.com/Yaxser/Backstab/releases/download/v1.0.1-beta
 $backstabPath = "$toolsDir\Backstab64.exe"
 $taskName = "KillWSLZombie"
 $logPath = "$toolsDir\zombie-kill.log"
-$xmlPath = "$toolsDir\zombie-killer-task.xml"
 
 # Min age in seconds for a process to be considered a zombie
 # (excludes clean shutdown transients)
