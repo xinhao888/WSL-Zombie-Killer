@@ -3,12 +3,14 @@
   WSL Zombie Killer - Universal Edition
   Detects and terminates zombie wslservice.exe processes.
    
-   DETECTION (multi-layer, no false positives):
-     1. vmmem / VmmemWSL exists → WSL VM is alive → SKIP (strongest signal)
-     2. wslservice age < 120s → still booting → SKIP (grace period)
-     3. wslservice has child processes → normal WSL → SKIP
-     4. LxssManager "Running" → definitely not zombie → SKIP
-     5. Double-check after 3s delay before killing
+  DETECTION (multi-layer, no false positives):
+    1. VmmemWSL or vmmem exists → WSL VM is alive → SKIP (strongest signal)
+    2. wslservice has child processes → normal WSL → SKIP
+    3. Process age unknown or < 60s → assume starting up → SKIP
+       (age unknown = WMI hasn't indexed yet, treat as young)
+    4. LxssManager "Running" → definitely not zombie → SKIP
+       (Stopped is NOT required — some Win10 systems always show Stopped)
+    5. Double-check after 3s delay before killing
    
   KILL (auto-fallback):
     1. Backstab.exe (kernel driver, Microsoft-signed)
@@ -36,6 +38,10 @@ $backstabPath = "$toolsDir\Backstab64.exe"
 $taskName = "KillWSLZombie"
 $logPath = "$toolsDir\zombie-kill.log"
 
+# Min age in seconds for a process to be considered a zombie
+# (excludes clean shutdown transients)
+$minProcAge = 60
+
 function Show-Help {
     Write-Host @"
 WSL Zombie Killer - Universal Edition
@@ -46,11 +52,11 @@ USAGE:
   powershell -File kill-zombie.ps1                Run once
 
 DETECTION (safe):
-   vmmem / VmmemWSL exists → WSL VM alive → skip
-   wslservice age < 120s → still booting → skip
+   VmmemWSL exists → WSL VM alive → skip
    wslservice has children → normal → skip
-   Age > 120s + no vmmem + no children → zombie
+   Process age >60s + no children + VmmemWSL gone → zombie
    Double-check after 3s before killing
+   (LxssManager is supplementary only — some Win10 systems always show Stopped)
 
 KILL METHODS (auto-fallback):
   1. Backstab (kernel driver)
@@ -151,25 +157,26 @@ function Test-WSLZombie {
     $proc = Get-Process wslservice -ErrorAction SilentlyContinue
     if (-not $proc) { return $false }
 
-    # Safety 1: Vmmem process exists = WSL VM is alive, NOT a zombie
-    # Some systems name it "VmmemWSL", others just "vmmem" (Win10 22H2)
+    # Safety 1: VmmemWSL or vmmem process exists = WSL VM is alive, NOT a zombie
+    # Win11 uses "VmmemWSL", Win10 22H2 uses "vmmem" — check both
     if ((Get-Process VmmemWSL -ErrorAction SilentlyContinue) -or (Get-Process vmmem -ErrorAction SilentlyContinue)) { return $false }
 
-    # Safety 2: wslservice is very young (< 120s) — WSL may still be booting, vmmem hasn't spawned yet
-    # Give it more time before judging
+    # Safety 2: wslservice with child processes = normal WSL running
+    # Orphaned wslservice (no children) = likely zombie
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
+    if ($children) { return $false }
+
+    # Get process age via CIM (Get-Process StartTime may be empty on some systems)
+    $procAge = $null
     $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -Property CreationDate -ErrorAction SilentlyContinue
     if ($ci -and $ci.CreationDate) {
         try {
             $ts = [DateTime]::ParseExact($ci.CreationDate.Substring(0,14), 'yyyyMMddHHmmss', $null)
             $procAge = (Get-Date) - $ts
-            if ($procAge.TotalSeconds -lt 120) { return $false }
         } catch {}
     }
-
-    # Safety 3: wslservice with child processes = normal WSL running
-    # Orphaned wslservice (no children) = likely zombie
-    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
-    if ($children) { return $false }
+    # If age unknown (WMI missed young process) or < 60s → assume starting up, skip
+    if ((-not $procAge) -or ($procAge.TotalSeconds -lt $minProcAge)) { return $false }
 
     # Check LxssManager service state (supplementary, not primary — service may show
     # Stopped even when WSL is running on some Win10 systems)
