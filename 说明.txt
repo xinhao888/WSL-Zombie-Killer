@@ -1,0 +1,151 @@
+╔═══════════════════════════════════════════════════════════════╗
+║              WSL Zombie Killer                              ║
+║         Universal Edition — Auto-kill wslservice.exe        ║
+╚═══════════════════════════════════════════════════════════════╝
+
+GitHub:  https://github.com/xinhao888/WSL-Zombie-Killer
+作者:    XinHaoZiDongHua
+License: MIT
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ PROBLEM / 问题说明                                              │
+│                                                                 │
+│ Windows 10 22H2 has a known LxssManager bug:                    │
+│ After abnormal WSL shutdown, wslservice.exe gets stuck          │
+│ in a zombie state and cannot be killed.                         │
+│ This forces WSL VM to rebuild every 1-3 minutes.                │
+│ Microsoft never backported the fix to Windows 10.               │
+│                                                                 │
+│ Windows 10 22H2 的 LxssManager 已知 bug：                       │
+│ WSL 异常关闭后 wslservice.exe 卡死成僵尸，                       │
+│ 导致 VM 每隔 1-3 分钟重建，服务反复断连。                        │
+│ Microsoft 未向 Win10 推送修复。                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ DETECTION (Safe — No False Positives) / 检测机制（不会误杀）    │
+│                                                                 │
+│  Safeguard 1: Only "Stopped", NOT "Stop Pending"                │
+│               只匹配 "Stopped"，不匹配 "Stop Pending"            │
+│               (excludes normal shutdown / 排除正常关机)          │
+│                                                                 │
+│  Safeguard 2: Process age > 60 seconds                          │
+│               进程存活 > 60 秒才杀                               │
+│               (excludes transient states / 排除开关机瞬态)       │
+│                                                                 │
+│  Safeguard 3: Double-check after 3s delay before killing        │
+│               等待 3 秒双重确认后才杀                            │
+│               (eliminates false positives / 排除误判)            │
+│                                                                 │
+│  Steps / 步骤:                                                  │
+│    1. wslservice.exe running >60s + LxssManager "Stopped"       │
+│    2. Re-verified after 3 seconds / 3 秒后再次确认              │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ KILL METHODS (Auto-fallback) / 杀进程方式（自动降级）            │
+│                                                                 │
+│  1. Backstab (kernel driver, Microsoft-signed / 内核驱动)        │
+│  2. taskkill /F                                                 │
+│  3. Stop-Process -Force                                         │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ INSTALL (Admin) / 安装（需要管理员权限）                          │
+│                                                                 │
+│  ⚡ One-click / 一键安装：双击 一键安装.vbs                       │
+│                                                                 │
+│  Or command line / 命令行：                                      │
+│    powershell -File kill-zombie.ps1 -Install                    │
+│    — or —                                                       │
+│    install.bat                                                  │
+│                                                                 │
+│  What happens / 安装后：                                         │
+│  - Creates scheduled task "KillWSLZombie"                       │
+│  - Triggers at boot + LxssManager start                         │
+│  - Checks every 30s, kills zombie, stops until next trigger     │
+│  - Downloads Backstab.exe if missing                            │
+│  - Adds Defender exclusion                                      │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ UNINSTALL (Admin) / 卸载（需要管理员权限）                        │
+│                                                                 │
+│  ⚡ One-click / 一键卸载：双击 一键卸载.vbs                       │
+│                                                                 │
+│  Or command line / 命令行：                                      │
+│    powershell -File kill-zombie.ps1 -Uninstall                  │
+│    — or —                                                       │
+│    uninstall.bat                                                │
+│    — or —                                                       │
+│    schtasks /Delete /TN "KillWSLZombie" /F                      │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ FILE STRUCTURE / 文件结构                                        │
+│                                                                 │
+│  README.md               English / 英文文档                     │
+│  说明.txt                Chinese+English / 中英双语本文件       │
+│  LICENSE                 MIT License                            │
+│  .gitignore              Git ignore rules                       │
+│  kill-zombie.ps1         Main script / 主脚本                   │
+│  install.bat             Installer / 安装器                     │
+│  uninstall.bat           Uninstaller / 卸载器                   │
+│  一键安装.vbs             One-click install (relative path)        │
+│  一键卸载.vbs             One-click uninstall (relative path)      │
+│  zombie-killer-task.xml  Task definition / 任务配置             │
+│  zombie-kill.log         Kill log / 运行日志（自动生成）         │
+│  Backstab64.exe          Killer tool / 杀进程工具（见下方说明）  │
+│                                                                 │
+│  Note: Backstab64.exe not in repo (size + AV false positive).   │
+│  Auto-downloaded during install, or place manually from:        │
+│  https://github.com/Yaxser/Backstab/releases                    │
+│                                                                 │
+│  注意：Backstab64.exe 未包含在仓库中，安装时自动下载。            │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ VIEW LOG / 查看日志                                              │
+│                                                                 │
+│  type D:\WSL-Tools\zombie-kill.log                              │
+│                                                                 │
+│  Sample / 示例：                                                 │
+│  2026-05-13 20:00:00 - Detected zombie wslservice.exe PID 4372  │
+│  2026-05-13 20:00:05 - Killed via Backstab                      │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ MANUAL KILL / 手动杀僵尸                                         │
+│                                                                 │
+│  Backstab64.exe -n wslservice.exe -k                            │
+│  (Admin required / 需要管理员权限)                               │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ RECOMMENDATIONS / 建议                                           │
+│                                                                 │
+│  ✅ Use "wsl --terminate <distro>" instead of --shutdown         │
+│     用 --terminate 替代 --shutdown，减少触发概率                 │
+│  ✅ Works with all WSL distros / 兼容所有 WSL 发行版             │
+│  💡 Permanent fix: upgrade to Windows 11 24H2+                  │
+│     根治方案：升级 Windows 11 24H2+                             │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ LINKS / 相关链接                                                 │
+│                                                                 │
+│  Backstab:          https://github.com/Yaxser/Backstab          │
+│  System Informer:   https://github.com/winsiderss/systeminformer│
+│  WSL Issue #1086:   https://github.com/microsoft/WSL/issues/1086│
+│  WSL Issue #10505:  https://github.com/microsoft/WSL/issues/10505│
+└─────────────────────────────────────────────────────────────────┘
