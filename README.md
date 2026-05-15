@@ -107,6 +107,10 @@ Get-Process wslservice -ErrorAction SilentlyContinue | Select-Object Id, StartTi
 | 防误杀 | ❌ 无 | ✅ 4s 双确认 |
 | 安装卸载 | ❌ 手打命令 | ✅ 双击 VBS |
 
+### 标签
+
+`wsl2` `wsl` `zombie` `windows-10` `wslservice` `lxssmanager` `powershell` `windows-subsystem-for-linux` `startwsl`
+
 ---
 
 ## English
