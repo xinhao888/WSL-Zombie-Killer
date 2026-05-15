@@ -13,7 +13,7 @@
 
 ### 简介
 
-Windows 10 22H2 上 LxssManager 存在已知 bug：`wslservice.exe` 在 WSL 退出后可能残留为僵尸进程，且 `wsl --shutdown` 100% 产生此类僵尸。每次开机时自动清理残留僵尸并启动 WSL，然后持续监控 WSL 存活状态，发现 wslhost 消失后自动清理僵尸 wslservice。
+Windows 10 22H2 上 LxssManager 存在已知 bug：`wslservice.exe` 在 WSL 退出后可能残留为僵尸进程，且 `wsl --shutdown` 100% 产生此类僵尸。本工具专治 WSL 僵尸进程残留，开机自动清理，无需重启电脑。每次开机时自动清理残留僵尸并启动 WSL，然后持续监控 WSL 存活状态，发现 wslhost 消失后自动清理僵尸 wslservice。
 
 ### 文件结构
 
@@ -66,6 +66,8 @@ Boot
 - `wslhost.exe` — WSL 与 Windows 交互的代理进程，存在即 WSL 存活
 - 杀僵尸后不自动拉起，避免反复崩溃；用户手动 `wsl` 后自动恢复
 - 4 秒双确机制：首次发现 wslhost 缺失不立即杀，等 4 秒再确认一次，避免启动期误杀
+
+这是一个 WSL 开机自启工具，自动清除 wslservice 残留进程，解决 WSL 卡死、无法启动、wsl 命令无响应等问题。适用于 Windows 10 22H2 WSL2 环境。
 
 ### 计划任务配置
 
