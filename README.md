@@ -79,11 +79,14 @@ Boot
 ### 验证
 
 ```powershell
+# 检查计划任务状态
+schtasks /Query /TN "StartWSL" /FO LIST | findstr "就绪\|上次结果"
+
 # 检查进程
 Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name, StartTime
 
 # 检查 WSL 连通性
-wsl -- echo ok
+wsl.exe -- echo ok
 
 # 监控循环活跃
 Get-Process wslservice -ErrorAction SilentlyContinue | Select-Object Id, StartTime
@@ -180,7 +183,7 @@ Boot
 Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name, StartTime
 
 # Check WSL is reachable
-wsl -- echo ok
+wsl.exe -- echo ok
 
 # Check monitor loop is active
 Get-Process wslservice -ErrorAction SilentlyContinue | Select-Object Id, StartTime
