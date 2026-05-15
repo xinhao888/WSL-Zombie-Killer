@@ -1,5 +1,10 @@
 # StartWSL — WSL 开机自启 + 僵尸进程清理 / Auto-start WSL on boot + zombie cleanup
 
+![Windows](https://img.shields.io/badge/Windows-10%2022H2-blue)
+![WSL](https://img.shields.io/badge/WSL-2-green)
+![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-yellow)
+![License](https://img.shields.io/badge/License-MIT-orange)
+
 [中文](#中文) | [English](#english)
 
 ---
@@ -43,15 +48,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<路径>\install-task.ps1" 
 ### 工作原理
 
 ```
-开机 10 秒后
-  ├── taskkill /F /IM wslservice.exe  （清除残留僵尸）
-  ├── Start-Sleep 5
-  ├── wsl                               （启动默认发行版）
-  ├── Start-Sleep 20                    （等待完全启动）
-  └── 持续监测循环（每 3 秒）：
-        wslhost.exe 存在？
-          ├── 是 → 不杀 wslservice，继续监测
-          └── 否 → 等 4 秒 → taskkill wslservice（不自动拉起）
+Boot
+  │ (delay 10s)
+  ├─ [Step 1] taskkill /F /IM wslservice.exe  ← 清除残留僵尸
+  ├─ [Step 2] Start-Sleep 5
+  ├─ [Step 3] wsl                               ← 启动默认发行版
+  ├─ [Step 4] Start-Sleep 20                    ← 等待完全启动
+  └─ [Monitor Loop] (every 3s):
+        wslservice running + wslhost missing?
+          ├─ Yes → wait 4s → double check
+          │         ├─ still zombie → taskkill wslservice
+          │         └─ wslhost back → skip (safe)
+          └─ No → skip
 ```
 
 - `wslservice.exe` — WSL 的 Windows 侧服务进程
@@ -71,14 +79,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<路径>\install-task.ps1" 
 ### 验证
 
 ```powershell
-# 检查任务
-schtasks /Query /TN "StartWSL" /FO LIST
+# 检查进程
+Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name, StartTime
 
-# 检查 WSL 进程（wslhost 存在 = WSL 存活）
-Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name
-
-# 检查默认发行版是否可访问
+# 检查 WSL 连通性
 wsl -- echo ok
+
+# 监控循环活跃
+Get-Process wslservice -ErrorAction SilentlyContinue | Select-Object Id, StartTime
 ```
 
 ### 系统要求
@@ -86,6 +94,15 @@ wsl -- echo ok
 - Windows 10 / 11
 - WSL 2 已安装
 - 当前用户下已有 WSL 发行版
+
+### 为什么选择此工具
+
+| 场景 | 社区方案 | WSL-Tools |
+|------|---------|-----------|
+| 开机清理僵尸 | ❌ 手动 taskkill | ✅ 全自动 |
+| 运行中监控 | ❌ 无 | ✅ 3s 轮询 |
+| 防误杀 | ❌ 无 | ✅ 4s 双确认 |
+| 安装卸载 | ❌ 手打命令 | ✅ 双击 VBS |
 
 ---
 
@@ -128,15 +145,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<path>\install-task.ps1" -U
 ### How It Works
 
 ```
-10 seconds after boot
-  ├── taskkill /F /IM wslservice.exe  (clear residual zombies)
-  ├── Start-Sleep 5
-  ├── wsl                               (start default distro)
-  ├── Start-Sleep 20                    (wait for full startup)
-  └── Monitoring loop (every 3s):
-         wslhost.exe present?
-           ├── Yes → skip, continue monitoring
-           └── No  → wait 4s → taskkill wslservice (no auto-restart)
+Boot
+  │ (delay 10s)
+  ├─ [Step 1] taskkill /F /IM wslservice.exe  ← clear residual zombies
+  ├─ [Step 2] Start-Sleep 5
+  ├─ [Step 3] wsl                               ← start default distro
+  ├─ [Step 4] Start-Sleep 20                    ← wait for full startup
+  └─ [Monitor Loop] (every 3s):
+        wslservice running + wslhost missing?
+          ├─ Yes → wait 4s → double check
+          │         ├─ still zombie → taskkill wslservice
+          │         └─ wslhost back → skip (safe)
+          └─ No → skip
 ```
 
 - `wslservice.exe` — Windows-side WSL service process
@@ -156,14 +176,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<path>\install-task.ps1" -U
 ### Verification
 
 ```powershell
-# Check task
-schtasks /Query /TN "StartWSL" /FO LIST
+# Check processes
+Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name, StartTime
 
-# Check WSL processes (wslhost present = WSL alive)
-Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name
-
-# Check default distro is reachable
+# Check WSL is reachable
 wsl -- echo ok
+
+# Check monitor loop is active
+Get-Process wslservice -ErrorAction SilentlyContinue | Select-Object Id, StartTime
 ```
 
 ### Requirements
@@ -171,3 +191,12 @@ wsl -- echo ok
 - Windows 10 / 11
 - WSL 2 installed
 - A WSL distro registered under the current user
+
+### Why This Tool
+
+| Scenario | DIY Approach | WSL-Tools |
+|----------|-------------|-----------|
+| Bootup zombie cleanup | ❌ Manual taskkill | ✅ Fully automatic |
+| Runtime monitoring | ❌ None | ✅ 3s polling |
+| False-positive prevention | ❌ None | ✅ 4s double-check |
+| Install/uninstall | ❌ Manual commands | ✅ Double-click VBS |
