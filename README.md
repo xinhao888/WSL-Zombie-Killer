@@ -74,12 +74,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<路径>\install-task.ps1" 
 # 检查任务
 schtasks /Query /TN "StartWSL" /FO LIST
 
-# 检查进程
+# 检查 WSL 进程（wslhost 存在 = WSL 存活）
 Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name
 
-# 检查 WSL 全栈
-wsl -d Ubuntu-24.04 -- bash -c "cat /proc/1/comm; systemctl is-active openclaw-gateway.service hermes-gateway.service"
-curl.exe -s -o NUL -w "%{http_code}" http://127.0.0.1:18789/
+# 检查默认发行版是否可访问
+wsl -- echo ok
 ```
 
 ### 系统要求
@@ -160,12 +159,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<path>\install-task.ps1" -U
 # Check task
 schtasks /Query /TN "StartWSL" /FO LIST
 
-# Check processes
+# Check WSL processes (wslhost present = WSL alive)
 Get-Process wslhost, wslservice -ErrorAction SilentlyContinue | Format-Table Id, Name
 
-# Check WSL full stack
-wsl -d Ubuntu-24.04 -- bash -c "cat /proc/1/comm; systemctl is-active openclaw-gateway.service hermes-gateway.service"
-curl.exe -s -o NUL -w "%{http_code}" http://127.0.0.1:18789/
+# Check default distro is reachable
+wsl -- echo ok
 ```
 
 ### Requirements
